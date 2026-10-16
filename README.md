@@ -17,9 +17,9 @@ to date, because a player can sign in or out on start.ng while the game is open.
 Every reply is checked three ways before it is believed:
 
 ```js
-if (e.origin !== origin) return;              // only start.ng can answer
-if (e.source !== el.contentWindow) return;    // only our own frame
-if (data.requestId !== requestId) return;     // only an answer to this request
+if (e.origin !== origin) return; // only start.ng can answer
+if (e.source !== el.contentWindow) return; // only our own frame
+if (data.requestId !== requestId) return; // only an answer to this request
 ```
 
 ### The character rule
@@ -39,11 +39,11 @@ player, so the game still runs and scores into this browser's own board.
 
 `startng.json` declares the columns, and the game sends exactly those:
 
-| Stat | Column | Order |
-| --- | --- | --- |
-| `distance` | Metres run | highest |
-| `shards` | Shards | highest |
-| `survived` | Survived | lowest, as `m:ss` |
+| Stat       | Column     | Order             |
+| ---------- | ---------- | ----------------- |
+| `distance` | Metres run | highest           |
+| `shards`   | Shards     | highest           |
+| `survived` | Survived   | lowest, as `m:ss` |
 
 Players are ranked by the first stat, then the next ones break ties. Only each player's best
 run is kept.
@@ -54,6 +54,7 @@ run is kept.
 npm install
 npm run dev      # guest only, sign-in needs start.ng
 npm run validate # typecheck, lint, test, build
+npm run smoke    # serves dist/ in a headless browser and plays a run
 ```
 
 Controls: `←` `→` to change lane, `Space` to jump. On a phone, swipe left, right and up.
@@ -66,6 +67,13 @@ Sign-in, scores and the shared board only work once the game is served from
 
 start.ng serves a built, static site and never runs a build of its own, so `dist/` is
 committed and `base` is set to `./` so every path is relative.
+
+The source `index.html` lives in `src/`, not at the repo root. start.ng looks for
+`index.html` "at the top of the repo or in `dist/`, `build/`, `docs/` or `out/`", top first,
+so a root `index.html` loading `/src/main.tsx` would be refused with `needs_build` before
+the built folder was ever looked at. With no `index.html` at the root, it falls through to
+`dist/` and finds a game that is already built. Vite's `root` is set to `src/` to make that
+work.
 
 ```bash
 npm run build        # writes dist/
@@ -85,17 +93,19 @@ node scripts/make-cover.mjs
 
 ## Layout
 
-| Path | Role |
-| --- | --- |
-| `src/startng/connect.ts` | The postMessage conversation with start.ng |
-| `src/startng/types.ts` | The shapes start.ng sends |
-| `src/startng/usePlayer.ts` | Who is playing, kept up to date |
-| `src/startng/local.ts` | A local board for when start.ng is not reachable |
-| `src/character/style.ts` | Validates and defaults a start.ng style |
-| `src/character/createCharacter.ts` | Draws the runner from that style |
-| `src/game/world.ts` | The rules, with no three.js so they can be tested |
-| `src/game/NeonScene.tsx` | The 3D world |
-| `docs/start-platform.md` | start.ng's platform docs |
+| Path                               | Role                                                   |
+| ---------------------------------- | ------------------------------------------------------ |
+| `src/startng/connect.ts`           | The postMessage conversation with start.ng             |
+| `src/startng/types.ts`             | The shapes start.ng sends                              |
+| `src/startng/usePlayer.ts`         | Who is playing, kept up to date                        |
+| `src/startng/local.ts`             | A local board for when start.ng is not reachable       |
+| `src/character/style.ts`           | Validates and defaults a start.ng style                |
+| `src/character/createCharacter.ts` | Draws the runner from that style                       |
+| `src/game/world.ts`                | The rules, with no three.js so they can be tested      |
+| `src/game/NeonScene.tsx`           | The 3D world                                           |
+| `src/index.html`                   | The source entry, kept out of the repo root on purpose |
+| `startng.json`                     | Leaderboard columns, read by start.ng at publish time  |
+| `docs/start-platform.md`           | start.ng's platform docs                               |
 
 ## Credits
 
