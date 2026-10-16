@@ -1,0 +1,9 @@
+{
+  "leaderboard": {
+    "stats": [
+      { "key": "distance", "label": "Metres run", "order": "highest" },
+      { "key": "shards", "label": "Shards", "order": "highest" },
+      { "key": "survived", "label": "Survived", "order": "lowest", "format": "time" }
+    ]
+  }
+}

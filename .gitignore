@@ -1,0 +1,14 @@
+node_modules
+.DS_Store
+*.local
+.vite
+coverage
+test-results
+playwright-report
+*.tsbuildinfo
+
+# dist/ is deliberately NOT ignored. start.ng never runs a build: it serves the committed
+# built folder, and refuses a source index.html with `needs_build`. See
+# docs/start-platform.md, "What a start.ng game is".
+# smoke test screenshot
+smoke.png

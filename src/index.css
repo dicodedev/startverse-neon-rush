@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: #07030f;
+    color: #eaf6ff;
+    font-family: theme('fontFamily.display');
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The game owns the viewport: no pull-to-refresh or text selection while running. */
+  #root {
+    user-select: none;
+    touch-action: none;
+  }
+}
+
+@layer components {
+  .neon-text {
+    color: #39ff88;
+    text-shadow:
+      0 0 6px rgba(57, 255, 136, 0.9),
+      0 0 22px rgba(57, 255, 136, 0.55);
+  }
+
+  .neon-text-pink {
+    color: #ff2d95;
+    text-shadow:
+      0 0 6px rgba(255, 45, 149, 0.9),
+      0 0 22px rgba(255, 45, 149, 0.5);
+  }
+
+  .panel {
+    @apply rounded-2xl border border-white/10 bg-black/70 backdrop-blur-sm;
+  }
+
+  .btn {
+    @apply rounded-full px-5 py-2 text-sm font-bold transition-transform;
+    @apply active:scale-95;
+  }
+
+  .btn-primary {
+    @apply btn bg-[#39ff88] text-[#07030f];
+    box-shadow: 0 0 18px rgba(57, 255, 136, 0.45);
+  }
+
+  .btn-ghost {
+    @apply btn border border-white/25 bg-white/5 text-white;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
