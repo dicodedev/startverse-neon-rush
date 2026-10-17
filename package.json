@@ -19,6 +19,7 @@
     "validate": "npm run typecheck && npm run lint && npm run test && npm run build",
     "smoke": "node scripts/smoke.mjs",
     "playtest": "node scripts/playtest.mjs",
+    "swipe:test": "node scripts/swipe-test.mjs",
     "cover": "node scripts/make-cover.mjs",
     "startng:check": "node scripts/startng-check.mjs",
     "startng:publish": "node scripts/startng-publish.mjs"

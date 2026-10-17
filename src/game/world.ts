@@ -93,6 +93,25 @@ export function moveLane(player: PlayerState, dir: -1 | 1): void {
   player.lane = Math.max(0, Math.min(LANES.length - 1, player.lane + dir));
 }
 
+/** What a swipe asks the player to do. */
+export type SwipeAction = { type: 'lane'; dir: -1 | 1 } | { type: 'jump' };
+
+/**
+ * Turns the distance a finger travelled into an action.
+ *
+ * Screen coordinates grow to the right and downwards, so `dx > 0` is a swipe towards the
+ * right and must produce `dir: 1`, which is the same "move right" the right arrow key
+ * produces. `dy < 0` is a swipe upwards, which jumps. A gesture whose dominant axis is
+ * under the threshold is ignored, so a tap does not move the player.
+ */
+export function swipeAction(dx: number, dy: number, threshold = 24): SwipeAction | null {
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
+    return { type: 'lane', dir: dx > 0 ? 1 : -1 };
+  }
+  if (dy < -threshold) return { type: 'jump' };
+  return null;
+}
+
 export function canJump(player: PlayerState): boolean {
   return player.onGround && player.alive;
 }

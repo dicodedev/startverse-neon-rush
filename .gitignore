@@ -15,3 +15,10 @@ smoke.png
 
 # playtest screenshot
 verify-direction.png
+
+# swipe test screenshots
+swipe-right.png
+swipe-left.png
+swipe-clamped-left.png
+swipe-tap.png
+keyboard-right.png

@@ -10,6 +10,7 @@ import {
   moveLane,
   scoreOf,
   step,
+  swipeAction,
   type PlayerState,
   type WorldState,
 } from './world';
@@ -223,6 +224,60 @@ describe('spawning', () => {
  *   - the player collides at z~0, before anything reaches the chase camera behind them;
  *   - the character model's front is +z, so from the camera you see their back.
  */
+describe('swipe controls', () => {
+  // Screen x grows to the right, so a finger moving right has a positive dx.
+  it('reads a rightward swipe as move-right, the same as the right arrow key', () => {
+    expect(swipeAction(60, 0)).toEqual({ type: 'lane', dir: 1 });
+    // The right arrow key calls moveLane with the same direction.
+    const p = createPlayer();
+    moveLane(p, 1);
+    expect(p.lane).toBe(2);
+  });
+
+  it('reads a leftward swipe as move-left, the same as the left arrow key', () => {
+    expect(swipeAction(-60, 0)).toEqual({ type: 'lane', dir: -1 });
+    const p = createPlayer();
+    moveLane(p, -1);
+    expect(p.lane).toBe(0);
+  });
+
+  it('reads an upward swipe as a jump', () => {
+    expect(swipeAction(0, -60)).toEqual({ type: 'jump' });
+  });
+
+  it('ignores a downward swipe, so the player is not pulled backwards', () => {
+    expect(swipeAction(0, 60)).toBeNull();
+  });
+
+  it('ignores a tap that moves less than the threshold', () => {
+    expect(swipeAction(8, 0)).toBeNull();
+    expect(swipeAction(0, -8)).toBeNull();
+  });
+
+  it('picks the dominant axis on a diagonal swipe', () => {
+    expect(swipeAction(60, -30)).toEqual({ type: 'lane', dir: 1 });
+    expect(swipeAction(-60, 30)).toEqual({ type: 'lane', dir: -1 });
+    // Mostly vertical, so it jumps rather than changing lane.
+    expect(swipeAction(20, -60)).toEqual({ type: 'jump' });
+  });
+
+  it('applies repeated swipes in the same direction until it hits the edge', () => {
+    const p = createPlayer();
+    for (let i = 0; i < 4; i += 1) {
+      const action = swipeAction(-60, 0);
+      if (action?.type === 'lane') moveLane(p, action.dir);
+    }
+    expect(p.lane).toBe(0);
+
+    const q = createPlayer();
+    for (let i = 0; i < 4; i += 1) {
+      const action = swipeAction(60, 0);
+      if (action?.type === 'lane') moveLane(q, action.dir);
+    }
+    expect(q.lane).toBe(LANES.length - 1);
+  });
+});
+
 describe('running direction', () => {
   it('spawns hazards ahead of the player, at a positive z', () => {
     const w = createWorld();

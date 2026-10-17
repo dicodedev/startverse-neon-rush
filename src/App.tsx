@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useRef } from 'react';
+import { CAMERA_FOV, CAMERA_POSITION, CAMERA_TARGET } from './game/constants';
 import { GameLoop } from './game/GameLoop';
 import { NeonScene } from './game/NeonScene';
 import { loadBoard, saveRun } from './game/scores';
@@ -9,6 +10,7 @@ import {
   createWorld,
   jump,
   moveLane,
+  swipeAction,
   type PlayerState,
   type WorldState,
 } from './game/world';
@@ -116,13 +118,13 @@ export default function App() {
       if (!tracking || useGame.getState().phase !== 'running') return;
       tracking = false;
       const t = e.changedTouches[0];
-      const dx = t.clientX - x;
-      const dy = t.clientY - y;
+      const action = swipeAction(t.clientX - x, t.clientY - y, SWIPE);
+      if (!action) return;
 
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE) {
-        moveLane(playerRef.current, dx > 0 ? 1 : -1);
-      } else if (dy < -SWIPE) {
+      if (action.type === 'jump') {
         jump(playerRef.current);
+      } else {
+        moveLane(playerRef.current, action.dir);
       }
     };
 
@@ -143,9 +145,16 @@ export default function App() {
         // world.ts scrolls the world towards -z, so the player travels towards +z and
         // hazards arrive from +z. Putting the camera at -z makes it chase from behind and
         // keeps the incoming track, rather than looking back up the track it has passed.
-        camera={{ position: [0, 4, -8], fov: 50, near: 0.1, far: 220 }}
+        // Note that looking along +z mirrors world x on screen, which is why LANES is
+        // ordered so that a higher lane index is further right. See constants.ts.
+        camera={{
+          position: [...CAMERA_POSITION],
+          fov: CAMERA_FOV,
+          near: 0.1,
+          far: 220,
+        }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        onCreated={({ camera }) => camera.lookAt(0, 1.2, 3)}
+        onCreated={({ camera }) => camera.lookAt(...CAMERA_TARGET)}
       >
         <GameLoop worldRef={worldRef} playerRef={playerRef} onHit={finishRun} />
         <NeonScene
