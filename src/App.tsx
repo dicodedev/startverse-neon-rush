@@ -139,9 +139,13 @@ export default function App() {
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, 4, 8], fov: 50, near: 0.1, far: 220 }}
+        // The chase camera sits behind the player on -z and looks towards +z.
+        // world.ts scrolls the world towards -z, so the player travels towards +z and
+        // hazards arrive from +z. Putting the camera at -z makes it chase from behind and
+        // keeps the incoming track, rather than looking back up the track it has passed.
+        camera={{ position: [0, 4, -8], fov: 50, near: 0.1, far: 220 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        onCreated={({ camera }) => camera.lookAt(0, 1.2, -3)}
+        onCreated={({ camera }) => camera.lookAt(0, 1.2, 3)}
       >
         <GameLoop worldRef={worldRef} playerRef={playerRef} onHit={finishRun} />
         <NeonScene

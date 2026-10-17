@@ -11,9 +11,14 @@ import type { PlayerState, WorldState } from './world';
 const OBSTACLE_POOL = 48;
 const SHARD_POOL = 96;
 
+/** Color palette - electric blue, cyan, violet, and deep navy for the African-inspired neon rooftop. */
+
+/** Block (obstacle) color - magenta accent. */
 const BLOCK_COLOR = '#ff2d95';
+/** Shard color - electric cyan. */
+const SHARD_COLOR = '#06ffa5';
+const NEON_BLUE = '#39ff88';
 const BARRIER_COLOR = '#ffd23f';
-const SHARD_COLOR = '#39ff88';
 
 /**
  * The whole 3D world.
@@ -56,8 +61,10 @@ export function NeonScene({
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
 
-    // Slide the grid to match how fast the world is moving.
-    gridTexture.offset.y -= (world.speed * dt) / 24;
+    // Slide the grid to match how fast the world is moving. The floor plane is rotated -90
+    // degrees about x, which maps the texture's +V axis onto world -z, so scrolling +y
+    // streams the ground towards the camera at -z, the same way the hazards travel.
+    gridTexture.offset.y += (world.speed * dt) / 24;
 
     if (characterRef.current) {
       characterRef.current.position.x = LANES[player.lane];
@@ -142,7 +149,7 @@ export function NeonScene({
         receiveShadow
       >
         <planeGeometry args={[40, TRACK_AHEAD + TRACK_BEHIND]} />
-        <meshStandardMaterial map={gridTexture} emissive="#14603a" emissiveMap={gridTexture} />
+        <meshStandardMaterial map={gridTexture} emissive={NEON_BLUE} emissiveMap={gridTexture} />
       </mesh>
 
       {/* Neon rails marking the edge of the track. Kept slim, and starting at the player

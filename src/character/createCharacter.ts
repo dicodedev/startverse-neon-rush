@@ -10,7 +10,12 @@ import type { CharacterStyle, NormalizedStyle } from '../startng/types';
  * but keep the body, colours, hair, hat and accessory recognisable."
  *
  * This is that low-poly interpretation: a stylised figure wearing the player's actual
- * colours, hair, hat and accessory. It faces -z, feet at y=0, about 2.6 units tall.
+ * colours, hair, hat and accessory. It faces +z, feet at y=0, about 2.6 units tall.
+ *
+ * Why +z: the world scrolls towards -z (see world.ts, `step`), so hazards and collectibles
+ * stream past the player from +z to -z. That means the player is travelling towards +z and
+ * the chase camera belongs behind them, at -z. The character's front therefore points +z,
+ * so from behind the camera you see their back and they run away from you.
  *
  * Structure follows the reference runner in Lane Dash (github.com/Blackburn0/HNG-Game),
  * rewritten here so it can be re-skinned without rebuilding geometry.
@@ -97,8 +102,9 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
 
   const legL = limb(-0.18, 0.8, mats.secondary, 0.8, 0.28);
   const legR = limb(0.18, 0.8, mats.secondary, 0.8, 0.28);
-  legL.add(box(0.3, 0.16, 0.44, mats.dark, 0, -0.86, -0.08)); // shoes
-  legR.add(box(0.3, 0.16, 0.44, mats.dark, 0, -0.86, -0.08));
+  // Shoes are pushed toward +z, the way the runner is travelling, so the toe points forward.
+  legL.add(box(0.3, 0.16, 0.44, mats.dark, 0, -0.86, 0.08)); // shoes
+  legR.add(box(0.3, 0.16, 0.44, mats.dark, 0, -0.86, 0.08));
 
   const torso = box(0.75, 0.85, 0.45, mats.primary, 0, 1.225, 0);
   const skirt = box(0.84, 0.34, 0.54, mats.secondary, 0, 0.76, 0); // female body only
@@ -113,10 +119,11 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
   const head = box(0.58, 0.6, 0.55, mats.skin, 0, 2.11, 0);
   body.add(neck, head);
 
-  // Eyes sit on the -z face, which is the direction the runner faces.
+  // The character's front is +z, which is the direction of travel: the world scrolls towards
+  // -z (see world.ts), so the player advances towards +z and the chase camera sits behind at -z.
   const eyeMat = mats.dark;
-  const eyeL = box(0.09, 0.11, 0.04, eyeMat, -0.13, 2.16, -0.28);
-  const eyeR = box(0.09, 0.11, 0.04, eyeMat, 0.13, 2.16, -0.28);
+  const eyeL = box(0.09, 0.11, 0.04, eyeMat, -0.13, 2.16, 0.28);
+  const eyeR = box(0.09, 0.11, 0.04, eyeMat, 0.13, 2.16, 0.28);
   body.add(eyeL, eyeR);
 
   /** Slots are emptied and refilled by applyStyle, so only one hair/hat/accessory shows. */
@@ -148,22 +155,22 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
         return;
       case 'bun':
         hairSlot.add(box(0.6, 0.3, 0.57, mats.hair, 0, 2.36, 0));
-        hairSlot.add(ball(0.17, mats.hair, 0, 2.52, 0.24, 12));
+        hairSlot.add(ball(0.17, mats.hair, 0, 2.52, -0.24, 12));
         return;
       case 'braids':
         hairSlot.add(box(0.62, 0.34, 0.59, mats.hair, 0, 2.36, 0));
-        hairSlot.add(cylinder(0.09, 0.09, 0.62, mats.hair, -0.3, 2.05, 0.16));
-        hairSlot.add(cylinder(0.09, 0.09, 0.62, mats.hair, 0.3, 2.05, 0.16));
+        hairSlot.add(cylinder(0.09, 0.09, 0.62, mats.hair, -0.3, 2.05, -0.16));
+        hairSlot.add(cylinder(0.09, 0.09, 0.62, mats.hair, 0.3, 2.05, -0.16));
         return;
       case 'dreads':
         hairSlot.add(box(0.62, 0.32, 0.59, mats.hair, 0, 2.36, 0));
         for (const x of [-0.26, -0.09, 0.09, 0.26]) {
-          hairSlot.add(box(0.11, 0.78, 0.11, mats.hair, x, 2.02, 0.22));
+          hairSlot.add(box(0.11, 0.78, 0.11, mats.hair, x, 2.02, -0.22));
         }
         return;
       case 'ponytail':
         hairSlot.add(box(0.62, 0.3, 0.59, mats.hair, 0, 2.36, 0));
-        hairSlot.add(ball(0.19, mats.hair, 0, 2.2, 0.32, 12));
+        hairSlot.add(ball(0.19, mats.hair, 0, 2.2, -0.32, 12));
         return;
       case 'short':
       default:
@@ -177,7 +184,7 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
     switch (s.hat) {
       case 'cap':
         hatSlot.add(box(0.62, 0.2, 0.6, mats.primary, 0, y, 0));
-        hatSlot.add(box(0.58, 0.08, 0.28, mats.primary, 0, y - 0.06, -0.4)); // peak
+        hatSlot.add(box(0.58, 0.08, 0.28, mats.primary, 0, y - 0.06, 0.4)); // peak
         return;
       case 'beanie':
         hatSlot.add(box(0.64, 0.3, 0.61, mats.secondary, 0, y, 0));
@@ -206,9 +213,9 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
   const buildAccessory = (s: NormalizedStyle) => {
     switch (s.accessory) {
       case 'glasses': {
-        accSlot.add(box(0.52, 0.05, 0.05, mats.dark, 0, 2.16, -0.29));
-        accSlot.add(box(0.16, 0.16, 0.04, mats.dark, -0.15, 2.16, -0.3));
-        accSlot.add(box(0.16, 0.16, 0.04, mats.dark, 0.15, 2.16, -0.3));
+        accSlot.add(box(0.52, 0.05, 0.05, mats.dark, 0, 2.16, 0.29));
+        accSlot.add(box(0.16, 0.16, 0.04, mats.dark, -0.15, 2.16, 0.3));
+        accSlot.add(box(0.16, 0.16, 0.04, mats.dark, 0.15, 2.16, 0.3));
         return;
       }
       case 'earrings':
@@ -216,15 +223,16 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
         accSlot.add(ball(0.06, mats.gold, 0.3, 2.02, 0, 10));
         return;
       case 'beard':
-        accSlot.add(box(0.5, 0.3, 0.5, mats.hair, 0, 1.94, -0.03));
+        accSlot.add(box(0.5, 0.3, 0.5, mats.hair, 0, 1.94, 0.03));
         return;
       case 'scarf':
         accSlot.add(box(0.66, 0.16, 0.5, mats.secondary, 0, 1.68, 0));
-        accSlot.add(box(0.18, 0.42, 0.1, mats.secondary, 0.22, 1.44, -0.24));
+        accSlot.add(box(0.18, 0.42, 0.1, mats.secondary, 0.22, 1.44, 0.24));
         return;
       case 'backpack':
-        accSlot.add(box(0.5, 0.52, 0.22, mats.secondary, 0, 1.3, 0.33));
-        accSlot.add(box(0.2, 0.08, 0.06, mats.dark, 0, 1.42, 0.46));
+        // A backpack sits on the back, which is -z now that the character faces +z.
+        accSlot.add(box(0.5, 0.52, 0.22, mats.secondary, 0, 1.3, -0.33));
+        accSlot.add(box(0.2, 0.08, 0.06, mats.dark, 0, 1.42, -0.46));
         return;
       case 'none':
       default:
@@ -266,8 +274,10 @@ export function createCharacter(initialStyle?: CharacterStyle | null): Character
     armR.rotation.x = swing * 0.8;
 
     // A small vertical bob on the beat of the steps, plus a slight forward lean.
+    // Positive rotation about x tips the top of the body towards +z, which is the way the
+    // runner is travelling, so a positive value leans into the run.
     body.position.y = running ? Math.abs(Math.cos(time * rate)) * 0.07 : 0;
-    body.rotation.x = running ? -0.12 : 0;
+    body.rotation.x = running ? 0.12 : 0;
   };
 
   applyStyle(initialStyle);

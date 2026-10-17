@@ -12,3 +12,6 @@ playwright-report
 # docs/start-platform.md, "What a start.ng game is".
 # smoke test screenshot
 smoke.png
+
+# playtest screenshot
+verify-direction.png

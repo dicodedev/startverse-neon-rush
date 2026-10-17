@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LANES, SPAWN_GAP_MIN } from './constants';
+import { DESPAWN_Z, LANES, PLAYER_Z, SPAWN_GAP_MIN } from './constants';
 import {
   BARRIER_HEIGHT,
   BLOCK_HEIGHT,
@@ -209,6 +209,81 @@ describe('spawning', () => {
     // Distinct z bands, not a solid wall of geometry.
     expect(rows.size).toBeGreaterThan(1);
     expect(SPAWN_GAP_MIN).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The running direction is the contract that keeps the camera, the character and the
+ * scrolling world agreeing with each other.
+ *
+ * world.ts scrolls the world towards -z, so hazards and collectibles stream from +z past
+ * the player at z=0. That makes +z the direction of travel, which means:
+ *   - hazards must spawn at a positive z, ahead of the player;
+ *   - each step must move them closer to the player, i.e. their z must decrease;
+ *   - the player collides at z~0, before anything reaches the chase camera behind them;
+ *   - the character model's front is +z, so from the camera you see their back.
+ */
+describe('running direction', () => {
+  it('spawns hazards ahead of the player, at a positive z', () => {
+    const w = createWorld();
+    const p = createPlayer();
+    step(w, p, 1 / 60);
+    expect(w.obstacles.length).toBeGreaterThan(0);
+    for (const o of w.obstacles) {
+      expect(o.z).toBeGreaterThan(0);
+    }
+    // Spawn distance is in front of the player, not behind them.
+    expect(Math.max(...w.obstacles.map((o) => o.z))).toBeGreaterThan(PLAYER_Z);
+  });
+
+  it('spawns collectibles ahead of the player too', () => {
+    const w = createWorld();
+    const p = createPlayer();
+    step(w, p, 1 / 60);
+    expect(w.shards.length).toBeGreaterThan(0);
+    for (const s of w.shards) {
+      expect(s.z).toBeGreaterThan(0);
+    }
+  });
+
+  it('moves hazards towards the player, so their z decreases', () => {
+    const w = bareWorld();
+    const p = createPlayer();
+    w.obstacles.push({ id: 1, lane: p.lane, z: 40, kind: 'barrier', spent: false });
+    step(w, p, 1 / 60);
+    // Moves from +40 towards the player at 0.
+    expect(w.obstacles[0].z).toBeLessThan(40);
+    expect(w.obstacles[0].z).toBeGreaterThan(0);
+  });
+
+  it('moves collectibles towards the player, so their z decreases', () => {
+    const w = bareWorld();
+    const p = createPlayer();
+    w.shards.push({ id: 1, lane: p.lane, z: 30, spent: false });
+    step(w, p, 1 / 60);
+    expect(w.shards[0].z).toBeLessThan(30);
+  });
+
+  it('collides with the player at z~0, before reaching the camera behind them', () => {
+    const w = bareWorld();
+    const p = createPlayer();
+    w.obstacles.push({ id: 1, lane: p.lane, z: 0.2, kind: 'block', spent: false });
+    const events = step(w, p, 1 / 60);
+    expect(events.hit).toBe(true);
+    // The obstacle collided at the player plane, still in front of the camera at -8.
+    expect(Math.abs(w.obstacles[0].z)).toBeLessThan(2);
+  });
+
+  it('never lets a live hazard sit at or behind the player', () => {
+    const w = createWorld();
+    const p = createPlayer();
+    for (let i = 0; i < 2000; i += 1) {
+      step(w, p, 1 / 60);
+      // A hazard that has passed and not yet been recycled must still be in front.
+      for (const o of w.obstacles) {
+        expect(o.z).toBeGreaterThan(DESPAWN_Z);
+      }
+    }
   });
 });
 

@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 
+/** Neon blue - used for the grid texture lines. */
+const GRID_COLOR = '#39ff88';
+/** Deep navy - used for the grid background. */
+const BG_COLOR = '#0a0f2a';
+
 /**
  * A neon grid texture drawn on a canvas, so the game ships no external image and start.ng
  * has nothing to fetch or check.
@@ -9,8 +14,8 @@ import * as THREE from 'three';
 export function createGridTexture(
   cell = 64,
   lines = 2,
-  color = '#39ff88',
-  background = '#07030f',
+  color = GRID_COLOR,
+  background = BG_COLOR,
 ): THREE.Texture {
   const size = cell;
   const canvas = document.createElement('canvas');
