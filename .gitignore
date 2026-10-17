@@ -22,3 +22,7 @@ swipe-left.png
 swipe-clamped-left.png
 swipe-tap.png
 keyboard-right.png
+
+# sign-in UI test screenshots
+signin-authenticated.png
+signin-offline.png

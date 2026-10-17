@@ -31,12 +31,14 @@ export function Menu({
         <div className="panel px-4 py-2 text-xs text-white/60">
           <p>
             Playing as <span className="font-bold text-white">{who.name}</span>
-            {who.isGuest && ' (guest)'}
+            {who.isGuest && !who.loading && ' (guest)'}
           </p>
           {best > 0 && <p className="tnum mt-1">Best: {best.toLocaleString()}</p>}
         </div>
 
-        {who.isGuest && (
+        {/* Not offered while start.ng has not answered yet, so a signed-in player returning
+            from the sign-in flow is never shown as a guest. */}
+        {!who.loading && who.isGuest && (
           <button
             type="button"
             onClick={onSignIn}
@@ -45,6 +47,12 @@ export function Menu({
           >
             {who.offline ? 'Sign-in needs start.ng' : 'Sign in with start.ng'}
           </button>
+        )}
+
+        {who.signInIssue && (
+          <p className="text-xs text-amber-200/90" role="status">
+            {who.signInIssue}
+          </p>
         )}
 
         <p className="text-[11px] leading-relaxed text-white/35">
@@ -66,7 +74,7 @@ export function GameOver({
   notice,
   onRestart,
   onSignIn,
-  isGuest,
+  who,
 }: {
   run: RunStats;
   best: number;
@@ -75,7 +83,7 @@ export function GameOver({
   notice: string | null;
   onRestart: () => void;
   onSignIn: () => void;
-  isGuest: boolean;
+  who: ResolvedPlayer;
 }) {
   return (
     <div className="absolute inset-0 z-30 grid place-items-center bg-black/70 p-4 backdrop-blur-[2px]">
@@ -98,7 +106,7 @@ export function GameOver({
 
         {notice && <p className="text-xs text-white/55">{notice}</p>}
 
-        {isGuest && (
+        {!who.loading && who.isGuest && (
           <button type="button" onClick={onSignIn} className="btn-ghost text-xs">
             Sign in to save your runs
           </button>

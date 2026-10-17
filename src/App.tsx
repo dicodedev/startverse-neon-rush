@@ -189,7 +189,7 @@ export default function App() {
           newBest={newBest}
           rank={rank}
           notice={notice}
-          isGuest={who.isGuest}
+          who={who}
           onRestart={startRun}
           onSignIn={who.signIn}
         />

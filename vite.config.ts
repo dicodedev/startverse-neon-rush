@@ -38,5 +38,14 @@ export default defineConfig({
     globals: true,
     // root is src/, so the glob is relative to that rather than to the repo.
     include: ['**/*.test.{ts,tsx}'],
+    environmentOptions: {
+      jsdom: {
+        // The game is served from <name>.start.ng in production, and the connect page only
+        // answers such an address. Pointing jsdom at <name>.start.localhost makes the
+        // Start.ng adapter actually switch on in tests instead of short-circuiting to
+        // guest-only. See src/startng/env.ts.
+        url: 'http://neon-rush.start.localhost:5173/',
+      },
+    },
   },
 });

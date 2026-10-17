@@ -33,14 +33,24 @@ let frame: Promise<HTMLIFrameElement> | null = null;
  */
 function connectFrame(): Promise<HTMLIFrameElement> {
   if (!START_NG) return Promise.reject(new Error('not served from start.ng'));
-  frame ??= new Promise((resolve, reject) => {
+  frame ??= new Promise<HTMLIFrameElement>((resolve, reject) => {
     const el = document.createElement('iframe');
     el.src = `${START_NG}/connect`;
     el.hidden = true;
     el.setAttribute('aria-hidden', 'true');
     el.title = 'start.ng sign-in';
     el.addEventListener('load', () => resolve(el), { once: true });
-    el.addEventListener('error', () => reject(new Error('connect frame failed')), { once: true });
+    el.addEventListener(
+      'error',
+      () => {
+        // Do not cache a frame that never loaded: a later attempt has to be able to try
+        // again, otherwise one hiccup leaves the game unable to reach start.ng for good.
+        frame = null;
+        el.remove();
+        reject(new Error('connect frame failed to load'));
+      },
+      { once: true },
+    );
     document.body.append(el);
   });
   return frame;
@@ -105,6 +115,45 @@ async function whoami(): Promise<WhoamiReply | null> {
 }
 
 /**
+ * The raw identity reply, so a caller can choose between the signed-in player and the guest
+ * look. `null` when start.ng could not be reached.
+ */
+export async function getIdentity(): Promise<WhoamiReply | null> {
+  return whoami();
+}
+
+/**
+ * True when the address still carries the marker start.ng puts there when it sends a player
+ * back from sign-in.
+ *
+ * Docs, "Sign in": "They come back with a game session in the address,
+ * `https://your-game.start.ng/#startng_session=eyJ...&expires_in=7200`. If you use the
+ * connect page you can ignore it (just ask `startng:whoami` again)."
+ *
+ * This is used only as a hint that the player has just come back, so the game knows to ask
+ * start.ng again. It is never treated as proof of who the player is, and nothing about the
+ * session is read from it: only start.ng's answer to `startng:whoami` can set the player.
+ */
+export function hasSignInReturn(): boolean {
+  if (!location.hash.includes('startng_session')) return false;
+  return new URLSearchParams(location.hash.slice(1)).has('startng_session');
+}
+
+/**
+ * Takes the session back out of the address bar, so it is not left sitting in the URL for the
+ * rest of the visit. The docs do the same for the HTTP API flow: "remove it from the address
+ * bar". Any other hash the game might use is kept.
+ */
+export function clearSignInReturn(): void {
+  if (!hasSignInReturn()) return;
+  const params = new URLSearchParams(location.hash.slice(1));
+  params.delete('startng_session');
+  params.delete('expires_in');
+  const rest = params.toString();
+  history.replaceState(null, '', location.pathname + location.search + (rest ? `#${rest}` : ''));
+}
+
+/**
  * The signed-in player, or start.ng's guest.
  *
  * The docs say to fall back to the guest: "Guests: use `guest` (the default look, named
@@ -123,29 +172,51 @@ export async function getWho(): Promise<Player | Guest | undefined> {
  *
  * The callback is only called on a real change. A check that failed to reach start.ng is
  * ignored rather than treated as a sign-out, so a network blip cannot sign the player out.
+ *
+ * Docs, "Who's playing": "Ask again when the player comes back to your tab
+ * (`visibilitychange` and `focus`): they may have signed in or out on start.ng."
  */
-export function onWhoChanged(fn: (who: Awaited<ReturnType<typeof getWho>>) => void): () => void {
-  let last: unknown = undefined;
+export function onWhoChanged(fn: (who: Player | Guest) => void): () => void {
+  let last: string | undefined;
   let primed = false;
 
-  const recheck = async () => {
-    if (document.visibilityState !== 'visible') return;
+  /**
+   * A short fingerprint of the identity. The face is a whole data URL, so it is left out:
+   * the character style changes together with the look, which is already in here.
+   */
+  const fingerprint = (who: Player | Guest) =>
+    'id' in who
+      ? `u:${who.id}:${who.name}:${who.account ?? ''}:${JSON.stringify(who.style ?? null)}`
+      : `g:${who.name}:${JSON.stringify(who.style ?? null)}`;
+
+  const recheck = async (opts?: { force?: boolean }) => {
+    if (!opts?.force && document.visibilityState !== 'visible') return;
     const who = await getWho();
     if (who === undefined) return;
-    const key = who === null ? null : JSON.stringify(who);
+    const key = fingerprint(who);
     if (primed && key === last) return;
     primed = true;
     last = key;
     fn(who);
   };
 
-  document.addEventListener('visibilitychange', recheck);
-  addEventListener('focus', recheck);
-  void recheck();
+  const onVisibility = () => void recheck();
+  const onFocus = () => void recheck();
+  // A page restored from the back/forward cache keeps its JavaScript but does not re-run
+  // React effects, so returning from start.ng that way would never be picked up. `pageshow`
+  // with `persisted` is the signal for exactly that case.
+  const onPageShow = (e: Event) => {
+    if ((e as PageTransitionEvent).persisted) void recheck({ force: true });
+  };
+
+  document.addEventListener('visibilitychange', onVisibility);
+  addEventListener('focus', onFocus);
+  addEventListener('pageshow', onPageShow);
 
   return () => {
-    document.removeEventListener('visibilitychange', recheck);
-    removeEventListener('focus', recheck);
+    document.removeEventListener('visibilitychange', onVisibility);
+    removeEventListener('focus', onFocus);
+    removeEventListener('pageshow', onPageShow);
   };
 }
 
