@@ -1,24 +1,31 @@
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useRef } from 'react';
+import { play, unlockAudio } from './audio/sfx';
 import { CAMERA_FOV, CAMERA_POSITION, CAMERA_TARGET } from './game/constants';
 import { GameLoop } from './game/GameLoop';
 import { NeonScene } from './game/NeonScene';
 import { loadBoard, saveRun } from './game/scores';
 import { useGame, type RunStats } from './game/store';
 import {
+  canJump,
   createPlayer,
   createWorld,
   jump,
   moveLane,
   swipeAction,
   type PlayerState,
+  type PickedShard,
   type WorldState,
 } from './game/world';
 import { usePlayer } from './startng/usePlayer';
 import { Hud } from './ui/Hud';
 import { Leaderboard } from './ui/Leaderboard';
-import { GameOver, Menu } from './ui/Overlays';
+import { GameOver, Menu, Paused, Victory } from './ui/Overlays';
 import { PlayerCard } from './ui/PlayerCard';
+import { RunControls } from './ui/RunControls';
+
+/** How long the checkpoint distance stays on the HUD. */
+const CHECKPOINT_FLASH_MS = 1600;
 
 export default function App() {
   const who = usePlayer();
@@ -31,15 +38,39 @@ export default function App() {
   const leaderboard = useGame((s) => s.leaderboard);
   const offline = useGame((s) => s.offline);
   const notice = useGame((s) => s.notice);
+  const checkpoint = useGame((s) => s.checkpoint);
+  const soundOn = useGame((s) => s.soundOn);
+  const toggleSound = useGame((s) => s.toggleSound);
 
   // The run lives in refs so the render loop can mutate it without re-rendering React.
   const worldRef = useRef<WorldState>(createWorld());
   const playerRef = useRef<PlayerState>(createPlayer());
 
+  // Treats collected this frame, waiting to be animated. A ref, because the render loop
+  // drains it every frame and must not re-render React to do so.
+  const pendingPickups = useRef<PickedShard[]>([]);
+  const takePending = useCallback(() => {
+    if (pendingPickups.current.length === 0) return [];
+    const queued = pendingPickups.current;
+    pendingPickups.current = [];
+    return queued;
+  }, []);
+
+  // Hides the checkpoint flash again after a moment.
+  useEffect(() => {
+    if (checkpoint === null) return;
+    const timer = setTimeout(() => useGame.getState().setCheckpoint(null), CHECKPOINT_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [checkpoint]);
+
   const startRun = useCallback(() => {
     worldRef.current = createWorld();
     playerRef.current = createPlayer();
+    // Clear any pickup still animating from the previous run.
+    pendingPickups.current = [];
     useGame.getState().setNotice(null);
+    unlockAudio();
+    play('uiStart');
     useGame.getState().start();
     void loadBoard(10).then((b) => {
       useGame.getState().setLeaderboard(b.entries);
@@ -47,15 +78,29 @@ export default function App() {
     });
   }, []);
 
-  const finishRun = useCallback(() => {
+  const togglePause = useCallback(() => {
+    const phase = useGame.getState().phase;
+    if (phase === 'running') {
+      useGame.getState().pause();
+      play('uiPause');
+    } else if (phase === 'paused') {
+      useGame.getState().resume();
+      play('uiResume');
+    }
+  }, []);
+
+  /** Saves the run and shows the right end card. */
+  const endRun = useCallback((won: boolean) => {
     const { distance, shardsCollected, elapsed } = worldRef.current;
     const run: RunStats = {
       distance,
       shards: shardsCollected,
       survived: elapsed,
     };
-    useGame.getState().end(run);
+    if (won) useGame.getState().win(run);
+    else useGame.getState().end(run);
     useGame.getState().setStats(run);
+    play(won ? 'victory' : 'gameOver');
 
     void (async () => {
       const result = await saveRun(run);
@@ -69,10 +114,33 @@ export default function App() {
     })();
   }, []);
 
+  const finishRun = useCallback(() => endRun(false), [endRun]);
+  const winRun = useCallback(() => endRun(true), [endRun]);
+
+  const onPickup = useCallback((picked: PickedShard[]) => {
+    for (const shard of picked) pendingPickups.current.push(shard);
+  }, []);
+
+  const onCheckpoint = useCallback((distance: number) => {
+    useGame.getState().setCheckpoint(distance);
+    play('checkpoint');
+  }, []);
+
   // Keyboard controls.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (useGame.getState().phase !== 'running') return;
+      const phase = useGame.getState().phase;
+
+      // Pause and resume work in both directions, from anywhere in a run.
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (phase === 'running' || phase === 'paused') {
+          e.preventDefault();
+          togglePause();
+        }
+        return;
+      }
+
+      if (phase !== 'running') return;
       switch (e.key) {
         case 'ArrowLeft':
         case 'a':
@@ -90,6 +158,8 @@ export default function App() {
         case ' ':
         case 'Spacebar':
           e.preventDefault();
+          // Only sound when the jump actually leaves the ground.
+          if (canJump(playerRef.current)) play('jump');
           jump(playerRef.current);
           break;
         default:
@@ -98,7 +168,7 @@ export default function App() {
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
-  }, []);
+  }, [togglePause]);
 
   // Touch controls: a swipe left, right or up.
   useEffect(() => {
@@ -122,6 +192,7 @@ export default function App() {
       if (!action) return;
 
       if (action.type === 'jump') {
+        if (canJump(playerRef.current)) play('jump');
         jump(playerRef.current);
       } else {
         moveLane(playerRef.current, action.dir);
@@ -156,18 +227,27 @@ export default function App() {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ camera }) => camera.lookAt(...CAMERA_TARGET)}
       >
-        <GameLoop worldRef={worldRef} playerRef={playerRef} onHit={finishRun} />
+        <GameLoop
+          worldRef={worldRef}
+          playerRef={playerRef}
+          onHit={finishRun}
+          onWin={winRun}
+          onPickup={onPickup}
+          onCheckpoint={onCheckpoint}
+        />
         <NeonScene
           world={worldRef.current}
           player={playerRef.current}
           style={who.style}
           running={phase === 'running'}
+          takePending={takePending}
         />
       </Canvas>
 
       <PlayerCard who={who} onSignIn={who.signIn} />
 
-      {phase === 'running' && <Hud stats={stats} best={best} />}
+      {phase === 'running' && <Hud stats={stats} best={best} checkpoint={checkpoint} />}
+      {phase === 'running' && <RunControls onPause={togglePause} />}
 
       {phase === 'menu' && (
         <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center p-4">
@@ -192,6 +272,18 @@ export default function App() {
           who={who}
           onRestart={startRun}
           onSignIn={who.signIn}
+        />
+      )}
+
+      {phase === 'paused' && <Paused onResume={() => togglePause()} onRestart={startRun} soundOn={soundOn} onToggleSound={toggleSound} />}
+
+      {phase === 'won' && lastRun && (
+        <Victory
+          run={lastRun}
+          best={best}
+          newBest={newBest}
+          onRestart={startRun}
+          who={who}
         />
       )}
     </div>

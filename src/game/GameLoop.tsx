@@ -1,7 +1,13 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef, type MutableRefObject } from 'react';
+import { play } from '../audio/sfx';
 import { useGame } from './store';
-import { step, type PlayerState, type WorldState } from './world';
+import {
+  step,
+  type PlayerState,
+  type PickedShard,
+  type WorldState,
+} from './world';
 
 /** How often the HUD is refreshed from the mutable world state. */
 const HUD_INTERVAL_MS = 80;
@@ -17,10 +23,18 @@ export function GameLoop({
   worldRef,
   playerRef,
   onHit,
+  onWin,
+  onPickup,
+  onCheckpoint,
 }: {
   worldRef: MutableRefObject<WorldState>;
   playerRef: MutableRefObject<PlayerState>;
   onHit: () => void;
+  onWin: () => void;
+  /** Called with every treat collected, for the pickup animation. */
+  onPickup: (picked: PickedShard[]) => void;
+  /** Called with the distance of a checkpoint reached. */
+  onCheckpoint: (distance: number) => void;
 }) {
   const sinceHud = useRef(0);
 
@@ -30,6 +44,20 @@ export function GameLoop({
     // Clamped so a backgrounded tab does not teleport obstacles into the player.
     const dt = Math.min(delta, 1 / 30);
     const events = step(worldRef.current, playerRef.current, dt);
+
+    // One sound per frame even if several treats were taken at once, so a trail of treats
+    // cannot stack into a roar.
+    if (events.picked.length > 0) {
+      onPickup(events.picked);
+      play('collect');
+    }
+
+    if (events.checkpoint !== null) onCheckpoint(events.checkpoint);
+
+    if (events.finished) {
+      onWin();
+      return;
+    }
 
     if (events.hit) {
       onHit();

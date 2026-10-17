@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { localBest } from '../startng';
 import type { LeaderboardEntry } from '../startng/types';
+import { isSoundEnabled, toggleSound } from '../audio/sfx';
 
-export type Phase = 'menu' | 'running' | 'over';
+export type Phase = 'menu' | 'running' | 'paused' | 'over' | 'won';
 
 export interface RunStats {
   distance: number;
@@ -28,9 +29,16 @@ interface GameState {
   offline: boolean;
   /** A message from start.ng, e.g. "Sign in to save your score". */
   notice: string | null;
+  /** Sound effects on or off, remembered between visits. */
+  soundOn: boolean;
+  /** The distance of the last checkpoint passed, for the HUD flash. */
+  checkpoint: number | null;
 
   start(): void;
+  pause(): void;
+  resume(): void;
   end(stats: RunStats): void;
+  win(stats: RunStats): void;
   setStats(stats: RunStats): void;
   setBest(best: number): void;
   setNewBest(newBest: boolean): void;
@@ -38,6 +46,8 @@ interface GameState {
   setLeaderboard(entries: LeaderboardEntry[]): void;
   setOffline(offline: boolean): void;
   setNotice(notice: string | null): void;
+  setCheckpoint(distance: number | null): void;
+  toggleSound(): void;
   reset(): void;
 }
 
@@ -53,9 +63,22 @@ export const useGame = create<GameState>((set) => ({
   leaderboard: [],
   offline: false,
   notice: null,
+  soundOn: isSoundEnabled(),
+  checkpoint: null,
 
-  start: () => set({ phase: 'running', stats: empty, lastRun: null, newBest: false, rank: null }),
+  start: () =>
+    set({
+      phase: 'running',
+      stats: empty,
+      lastRun: null,
+      newBest: false,
+      rank: null,
+      checkpoint: null,
+    }),
+  pause: () => set((s) => (s.phase === 'running' ? { phase: 'paused' } : s)),
+  resume: () => set((s) => (s.phase === 'paused' ? { phase: 'running' } : s)),
   end: (stats) => set({ phase: 'over', lastRun: stats }),
+  win: (stats) => set({ phase: 'won', lastRun: stats }),
   setStats: (stats) => set({ stats }),
   setBest: (best) => set({ best }),
   setNewBest: (newBest) => set({ newBest }),
@@ -63,5 +86,15 @@ export const useGame = create<GameState>((set) => ({
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setOffline: (offline) => set({ offline }),
   setNotice: (notice) => set({ notice }),
-  reset: () => set({ phase: 'menu', stats: empty, lastRun: null, newBest: false, rank: null }),
+  setCheckpoint: (checkpoint) => set({ checkpoint }),
+  toggleSound: () => set({ soundOn: toggleSound() }),
+  reset: () =>
+    set({
+      phase: 'menu',
+      stats: empty,
+      lastRun: null,
+      newBest: false,
+      rank: null,
+      checkpoint: null,
+    }),
 }));

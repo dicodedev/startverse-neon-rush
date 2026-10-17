@@ -144,3 +144,82 @@ function Kbd({ children }: { children: string }) {
     </kbd>
   );
 }
+
+/** Shown while the run is paused, without losing the scene behind it. */
+export function Paused({
+  onResume,
+  onRestart,
+  soundOn,
+  onToggleSound,
+}: {
+  onResume: () => void;
+  onRestart: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 grid place-items-center bg-black/60 p-4 backdrop-blur-[2px]">
+      <div className="panel flex w-full max-w-xs flex-col items-center gap-4 p-6 text-center">
+        <h2 className="text-2xl font-black uppercase tracking-widest text-white/80">Paused</h2>
+
+        <button type="button" onClick={onResume} className="btn-primary w-full py-3">
+          Resume
+        </button>
+        <button type="button" onClick={onRestart} className="btn-ghost text-xs">
+          Restart run
+        </button>
+        <button type="button" onClick={onToggleSound} className="btn-ghost text-xs">
+          Sound: {soundOn ? 'on' : 'off'}
+        </button>
+        <p className="text-[11px] text-white/35">Press P or Esc to resume</p>
+      </div>
+    </div>
+  );
+}
+
+/** Shown when the finish line is reached. */
+export function Victory({
+  run,
+  best,
+  newBest,
+  onRestart,
+  who,
+}: {
+  run: RunStats;
+  best: number;
+  newBest: boolean;
+  onRestart: () => void;
+  who: ResolvedPlayer & { signIn: () => void };
+}) {
+  return (
+    <div className="absolute inset-0 z-30 grid place-items-center bg-black/70 p-4 backdrop-blur-[2px]">
+      <div className="panel flex w-full max-w-xs flex-col items-center gap-4 p-6 text-center">
+        <h2 className="neon-text-pink text-3xl font-black uppercase tracking-widest">
+          Finished!
+        </h2>
+        <p className="text-xs text-white/60">You cleared the whole grid.</p>
+
+        <dl className="grid w-full grid-cols-3 gap-2">
+          <Result label="Metres" value={Math.round(run.distance).toLocaleString()} accent />
+          <Result label="Shards" value={run.shards} accent />
+          <Result label="Time" value={formatTime(run.survived)} />
+        </dl>
+
+        <p className="tnum text-xs text-white/45">
+          Best: {best.toLocaleString()}
+          {newBest && <span className="neon-text"> · new best</span>}
+        </p>
+
+        {!who.loading && who.isGuest && (
+          <button type="button" onClick={who.signIn} className="btn-ghost text-xs">
+            Sign in to save your runs
+          </button>
+        )}
+
+        <button type="button" onClick={onRestart} className="btn-primary w-full py-3">
+          Run again
+        </button>
+      </div>
+    </div>
+  );
+}

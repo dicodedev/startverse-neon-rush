@@ -1,5 +1,7 @@
 import {
+  CHECKPOINT_SPACING,
   DESPAWN_Z,
+  FINISH_DISTANCE,
   GRAVITY,
   JUMP_VELOCITY,
   LANES,
@@ -64,12 +66,29 @@ export interface WorldState {
   shardsCollected: number;
   elapsed: number;
   speed: number;
+  /** Distance of the next checkpoint to reach. */
+  nextCheckpoint: number;
+  /** True once the finish line has been passed. */
+  finished: boolean;
+}
+
+/** A treat the player picked up on this step, with where to play its pickup animation. */
+export interface PickedShard {
+  id: number;
+  lane: number;
+  z: number;
 }
 
 export interface StepEvents {
   collected: number;
   /** True on the step the player is hit. */
   hit: boolean;
+  /** Every treat collected on this step, so the renderer can animate each one. */
+  picked: PickedShard[];
+  /** Distance of a checkpoint reached on this step, if any. */
+  checkpoint: number | null;
+  /** True on the step the finish line is passed. */
+  finished: boolean;
 }
 
 export function createWorld(): WorldState {
@@ -81,6 +100,8 @@ export function createWorld(): WorldState {
     shardsCollected: 0,
     elapsed: 0,
     speed: START_SPEED,
+    nextCheckpoint: CHECKPOINT_SPACING,
+    finished: false,
   };
 }
 
@@ -124,7 +145,13 @@ export function jump(player: PlayerState): void {
 
 /** Advances the world by `dt` seconds and reports what happened. */
 export function step(world: WorldState, player: PlayerState, dt: number): StepEvents {
-  const events: StepEvents = { collected: 0, hit: false };
+  const events: StepEvents = {
+    collected: 0,
+    hit: false,
+    picked: [],
+    checkpoint: null,
+    finished: false,
+  };
 
   // Speed ramps with distance so the run gets harder, up to a ceiling.
   world.speed = Math.min(MAX_SPEED, START_SPEED + world.distance * 0.0062);
@@ -132,6 +159,19 @@ export function step(world: WorldState, player: PlayerState, dt: number): StepEv
 
   world.distance += travel;
   world.elapsed += dt;
+
+  // Checkpoints are a distance milestone: they give the run a pulse and something to aim
+  // for, without ending the run. The finish is a long way out, so the game still plays as an
+  // endless runner for almost every run.
+  if (!world.finished && world.distance >= world.nextCheckpoint) {
+    if (world.nextCheckpoint >= FINISH_DISTANCE) {
+      world.finished = true;
+      events.finished = true;
+    } else {
+      events.checkpoint = world.nextCheckpoint;
+      world.nextCheckpoint += CHECKPOINT_SPACING;
+    }
+  }
 
   if (!player.onGround) {
     player.vy -= GRAVITY * dt;
@@ -165,6 +205,9 @@ export function step(world: WorldState, player: PlayerState, dt: number): StepEv
     s.spent = true;
     world.shardsCollected += 1;
     events.collected += 1;
+    // Reported so the renderer can play a pickup animation at this treat, and so the same
+    // treat is never animated or scored twice: `spent` is already set above.
+    events.picked.push({ id: s.id, lane: s.lane, z: s.z });
   }
 
   for (const o of world.obstacles) {

@@ -5,7 +5,8 @@ import { createCharacter, type Character } from '../character/createCharacter';
 import type { CharacterStyle } from '../startng/types';
 import { LANES, TRACK_AHEAD, TRACK_BEHIND } from './constants';
 import { createGridTexture } from './gridTexture';
-import type { PlayerState, WorldState } from './world';
+import { TreatBursts } from './TreatBursts';
+import type { PlayerState, PickedShard, WorldState } from './world';
 
 /** Meshes kept in reserve so new obstacles never allocate during play. */
 const OBSTACLE_POOL = 48;
@@ -32,11 +33,14 @@ export function NeonScene({
   player,
   style,
   running,
+  takePending,
 }: {
   world: WorldState;
   player: PlayerState;
   style: CharacterStyle | null;
   running: boolean;
+  /** Drains the queue of treats collected this frame, for the pickup animations. */
+  takePending: () => PickedShard[];
 }) {
   const character: Character = useMemo(() => createCharacter(null), []);
   const gridTexture = useMemo(() => createGridTexture(), []);
@@ -97,12 +101,13 @@ export function NeonScene({
       cap.scale.set(1, isBarrier ? 0.32 : 1, 1);
     }
 
-    // Shards: spinning octahedra.
+    // Shards: spinning octahedra. A spent shard is hidden at once, because the pickup burst
+    // takes over from it.
     for (let i = 0; i < SHARD_POOL; i += 1) {
       const mesh = shardRefs.current[i];
       if (!mesh) continue;
       const s = world.shards[i];
-      if (!s) {
+      if (!s || s.spent) {
         mesh.visible = false;
         continue;
       }
@@ -177,6 +182,9 @@ export function NeonScene({
 
       {/* The player's start.ng character. */}
       <primitive object={character.root} ref={characterRef} />
+
+      {/* Pickup animations for collected treats, pooled so nothing allocates mid-run. */}
+      <TreatBursts takePending={takePending} />
 
       {/* Obstacle pool. */}
       {Array.from({ length: OBSTACLE_POOL }, (_, i) => (

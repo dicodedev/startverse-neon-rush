@@ -48,6 +48,18 @@ export const DESPAWN_Z = -TRACK_BEHIND;
 export const SPAWN_GAP_MIN = 12;
 export const SPAWN_GAP_MAX = 22;
 
+/**
+ * Distance between checkpoints, in metres. A checkpoint is a milestone that gives feedback
+ * and a sound; it does not end the run.
+ */
+export const CHECKPOINT_SPACING = 500;
+
+/**
+ * Where the run ends in victory, in metres. Kept far enough out that the game still reads as
+ * an endless runner, so reaching it is a real achievement rather than the usual outcome.
+ */
+export const FINISH_DISTANCE = 5000;
+
 /** Collision boxes, in the same units as the character (~2.6 tall). */
 export const PLAYER_HALF_WIDTH = 0.42;
 export const PLAYER_HEIGHT = 2.6;
